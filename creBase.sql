@@ -1,10 +1,10 @@
 ***********Creation des tables*************
 
-	create table CLIENTS (
-    numPass SERIAL PRIMARY KEY,
-    nom varchar(50) unique NOT NULL,
-    ville varchar(50) NOT NULL
-)
+			create table CLIENTS (
+				numPass SERIAL PRIMARY KEY,
+				nom varchar(50) unique NOT NULL,
+				ville varchar(50) NOT NULL
+			)
 
 	
 	
@@ -16,11 +16,11 @@
 |
 |
 
-		create table CHAMBRES (
-    numC SERIAL PRIMARY KEY,
-    lits integer default 2,
-    prix float NOT NULL
-)
+			create table CHAMBRES (
+				numC SERIAL PRIMARY KEY,
+				lits integer default 2,
+				prix float NOT NULL
+			)
 |
 |
 |
@@ -38,7 +38,7 @@
 
  );
 	
-	***********Remplissage des tables*************
+			***********Remplissage des tables*************
 	
 	
 				-----Insertion des clients-----
@@ -82,7 +82,24 @@
 
 
 
-----fonction qui affiche les chambres réservées pendant le mois d'Août dernier-----
+		--fonction qui affiche les chambres réservées pendant le mois d'Août dernier-----
+
+
+
+
+
+								CREATE or replace FUNCTION reservechambre8 ()
+								RETURNS TABLE(numC int ,lits int,prix real) as $list$
+
+								BEGIN
+									RETURN QUERY SELECT
+									 ch.*
+									FROM
+									 "CHAMBRES" AS ch,"RESERVATIONS" AS r
+									 WHERE ch."numC"=r."numC" AND EXTRACT(MONTH FROM r."départ")=08
+									 GROUP BY ch."numC";
+								END; 
+								$list$ LANGUAGE 'plpgsql';
 
 
 
@@ -91,95 +108,129 @@
 
 
 
+		-- fonction qui affiche les client qui ont reservé les chambres quit coûtent plus de 700 dhs-----
+
+
+								CREATE or replace FUNCTION afficher700dh ()
+								RETURNS TABLE(numPass varchar ,nom varchar,ville varchar) as $list$
+
+								BEGIN
+									RETURN QUERY SELECT
+									 cl.*
+									FROM
+									 chambres AS ch,reservations AS r,"clients" AS cl
+									 WHERE ch.numC=r.numC AND r.numPass = cl.numPass AND ch.prix>700
+									 GROUP BY cl.numPass;
+								END; 
+								$list$ LANGUAGE 'plpgsql';
+
+
+		--fonction qui affiche les chambres reservées par les clients dont les noms commecent par A----
+
+
+
+								CREATE or replace FUNCTION ClientNomA()
+								RETURNS TABLE(numC Numeric ,lits Numeric,prix Numeric) as $list$
+
+								BEGIN
+									RETURN QUERY SELECT
+									 ch.*
+									FROM
+									 chambres AS ch,reservations AS r,clients AS cl
+									 WHERE ch.numC=r.numC AND r.numPass = cl.numPass AND cl.nom Like'A%'
+									 GROUP BY ch.numC;
+								END; 
+								$list$ LANGUAGE 'plpgsql'; 
 
 
 
 
 
 
------ fonction qui affiche les client qui ont reservé les chambres quit coûtent plus de 700 dhs-----
+	---une fonction qui affiche les clients qui ont réservés plus de 2 chambres----
+
+
+
+								CREATE or replace FUNCTION clientsRéservées ()
+								RETURNS TABLE(numPass int ,nom varchar,ville varchar) as $list$
+
+								BEGIN
+									RETURN QUERY SELECT 
+									 cl.*
+									FROM
+									 "chambres" AS ch, "reservations" AS r,"clients" AS cl
+									 WHERE ch."numc"= r."numc" AND r."numpass" = cl."numpass" 
+									 GROUP BY cl."numpass"
+									having count(ch."numc")>2;
+								END; 
+								$list$ LANGUAGE 'plpgsql';
 
 
 
 
 
------fonction qui affiche les chambres reservées par les clients dont les noms commecent par A----
+	--une fonction qui affiche les clients qui habitent à Casablanca et qui on passé plus de 2 réservations ont réservés plus de 2 chambres-----
+
+
+								CREATE or replace FUNCTION clientsHabitent  ()
+								RETURNS TABLE(numPass int ,nom varchar,ville varchar) as $list$
+
+								BEGIN
+									RETURN QUERY SELECT 
+									 cl.*
+									FROM
+									 "chambres" AS ch, "reservations" AS r,"clients" AS cl
+									 WHERE ch."numc"= r."numc" AND r."numpass" = cl."numpass" 
+									 GROUP BY cl."numpass"
+									having count(ch."numc")>2 AND count(r."numpass")>2;
+								END; 
+								$list$ LANGUAGE 'plpgsql';
 
 
 
-CREATE OR REPLACE FUNCTION public.clientnoma(
-	)
-    RETURNS TABLE(numc numeric, lits numeric, prix numeric) 
-    LANGUAGE 'plpgsql'
-   BEGIN
-    RETURN QUERY SELECT
-     ch.*
-    FROM
-     chambres AS ch,reservations AS r,clients AS cl
-     WHERE ch.numC=r.numC AND r.numPass = cl.numPass AND cl.nom Like'A%'
-	 GROUP BY ch.numC;
-END; 
+												***************PROCEDURE**************
+												
+												
+												
+	-----une procédure qui permet de modifer le prix des chambres qui des prix supérieurs à 700dhs par 1000dhs-----------
 
-
-
-
-
-
------une fonction qui affiche les clients qui ont réservés plus de 2 chambres----
-
-
-
-CREATE OR REPLACE FUNCTION public.reservechambre8(
-	)
-
-BEGIN
-    RETURN QUERY SELECT
-     ch.*
-    FROM
-     chambres AS ch,reservations AS r
-     WHERE ch.numC=r.numC AND EXTRACT(MONTH FROM r.arrivee)=8
-	 GROUP BY ch.numC;
-END;
-
+								create or replace procedure ModifierPrix()
+								language plpgsql    
+								as $update$
+								begin
+									-- subtracting the amount from the sender's account 
+									update "chambres" 
+									set prix = 1000 
+									where prix >= 700;
+								end;$update$
 
 
 
 
+	-----une procédure qui permet de supprimer les clients qui n'ont passé des réservations------------
 
------une fonction qui affiche les clients qui habitent à Casablanca et qui on passé plus de 2 réservations ont réservés plus de 2 chambres-----
-
-
-
-				***************PROCEDURE**************
-				
-				
-				
---------une procédure qui permet de modifer le prix des chambres qui des prix supérieurs à 700dhs par 1000dhs-----------
-
----------une procédure qui permet de supprimer les clients qui n'ont passé des réservations------------
-
-CREATE OR REPLACE PROCEDURE public.supprimerclient(
-	)
-LANGUAGE 'plpgsql'
-AS $BODY$
-begin
-    delete from "clients" WHERE clients.numPass Not in(select numPass FROM reservations );
-end;
-$BODY$;
+								CREATE OR REPLACE PROCEDURE public.supprimerclient(
+									)
+								LANGUAGE 'plpgsql'
+								AS $BODY$
+								begin
+									delete from "clients" WHERE clients.numPass Not in(select numPass FROM reservations );
+								end;
+								$BODY$;
 
 
 
----------une procédure qui permet d'ajouter 100dhs pour les chambres qui ont plus de 2 lits---------
+		-----une procédure qui permet d'ajouter 100dhs pour les chambres qui ont plus de 2 lits---------
 
 
-create or replace procedure Ajout100dhLits()
-language plpgsql    
-as $updatePrix$
-begin
-    update chambres 
-    set prix = prix + 100
-    where lits > 2;
-end;$updatePrix$
+								create or replace procedure Ajout100dhLits()
+								language plpgsql    
+								as $updatePrix$
+								begin
+									update chambres 
+									set prix = prix + 100
+									where lits > 2;
+								end;$updatePrix$
 
 
 
